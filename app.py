@@ -1,5 +1,6 @@
 import streamlit as st
 import time
+import ollama
 st.set_page_config(page_title="Agentic Assistant Pro", page_icon="", layout="wide")
 st.markdown(
     """
@@ -102,12 +103,27 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 if prompt := st.chat_input("Initiate query..."):
+    # 1. Save user message to memory
     st.session_state.messages.append({"role": "user", "content": prompt})
+    
+    # 2. Display user message
     with st.chat_message("user"):
         st.markdown(prompt)
+        
+    # 3. Call AI and handle response
     with st.chat_message("assistant"):
         with st.spinner("Analyzing parameters..."):
-            time.sleep(1.5)
-            response = "I have scanned the documents. Based on the context provided..." 
-            st.markdown(response)
-            st.session_state.messages.append({"role": "assistant", "content": response})
+            try:
+                
+                api_response = ollama.chat(
+                    model='llama3.2',
+                    messages=st.session_state.messages
+                )
+                
+                bot_text = api_response.message.content
+
+                st.markdown(bot_text)
+                st.session_state.messages.append({"role": "assistant", "content": bot_text})
+                
+            except Exception as e:
+                st.error(f"Brain connection failed. Error: {e}")
