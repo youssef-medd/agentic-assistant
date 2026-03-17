@@ -102,28 +102,31 @@ if "messages" not in st.session_state:
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
-if prompt := st.chat_input("Initiate query..."):
-    # 1. Save user message to memory
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    
-    # 2. Display user message
+prompt = st.chat_input("Ask me anything...", accept_file="multiple")
+if prompt:
+    user_text = prompt.text if hasattr(prompt, 'text') else prompt
+    uploaded_files = prompt.files if hasattr(prompt, 'files') else []
+    if not user_text and uploaded_files:
+        user_text = f"I've uploaded {len(uploaded_files)} file(s). Please prepare to analyze them."
+    st.session_state.messages.append({"role": "user", "content": user_text})
     with st.chat_message("user"):
-        st.markdown(prompt)
-        
-    # 3. Call AI and handle response
+        st.markdown(user_text)
+        for f in uploaded_files:
+            st.caption(f"📎 Attached: {f.name}")
     with st.chat_message("assistant"):
-        with st.spinner("Analyzing parameters..."):
+        with st.spinner("Processing..."):
             try:
-                
-                api_response = ollama.chat(
+                response = ollama.chat(
                     model='llama3.2',
-                    messages=st.session_state.messages
+                    messages=[{"role": m["role"], "content": m["content"]} for m in st.session_state.messages]
                 )
-                
-                bot_text = api_response.message.content
+                if hasattr(response, 'message'):
+                    full_response = response.message.content
+                else:
+                    full_response = response['message']['content']
+                full_response = str(full_response)
+                st.markdown(full_response)
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
 
-                st.markdown(bot_text)
-                st.session_state.messages.append({"role": "assistant", "content": bot_text})
-                
             except Exception as e:
-                st.error(f"Brain connection failed. Error: {e}")
+                st.error(f"Error connecting to Ollama: {e}")
