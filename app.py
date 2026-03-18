@@ -3,7 +3,8 @@ import ollama
 from modules.tools import web_search
 from modules.parser import process_files
 from db.vector_store import ingest_document, query_documents, list_user_documents
-st.set_page_config(page_title="NEXUS — Intelligence Layer", page_icon="◈", layout="wide")
+from db.database import save_message, save_file, save_search
+st.set_page_config(page_title="HAMUS — Intelligence Layer", page_icon="◈", layout="wide")
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600&display=swap');
@@ -74,8 +75,8 @@ header[data-testid="stHeader"] { background: transparent !important; }
   margin: 0 auto;
 }
 
-.nexus-header { animation: boot 1s var(--transition); margin-bottom: 3rem; }
-.nexus-eyebrow {
+.hamus-header { animation: boot 1s var(--transition); margin-bottom: 3rem; }
+.hamus-eyebrow {
   font-family: 'DM Mono', monospace;
   font-size: 10px;
   letter-spacing: 0.3em;
@@ -85,7 +86,7 @@ header[data-testid="stHeader"] { background: transparent !important; }
   align-items: center;
   gap: 8px;
 }
-.nexus-eyebrow::before {
+.hamus-eyebrow::before {
   content: '';
   display: inline-block;
   width: 4px; height: 4px;
@@ -94,7 +95,7 @@ header[data-testid="stHeader"] { background: transparent !important; }
   box-shadow: 0 0 8px var(--pulse);
   animation: ticker 1.5s ease-in-out infinite;
 }
-.nexus-title {
+.hamus-title {
   font-family: 'Syne', sans-serif;
   font-size: clamp(38px, 5vw, 58px);
   font-weight: 800;
@@ -108,7 +109,7 @@ header[data-testid="stHeader"] { background: transparent !important; }
   animation: arc-trace 6s ease infinite;
   margin-bottom: 8px;
 }
-.nexus-sub {
+.hamus-sub {
   font-family: 'DM Mono', monospace;
   font-size: 12px;
   color: var(--text-secondary);
@@ -288,7 +289,7 @@ with st.sidebar:
     st.markdown(
         '<div style="margin-bottom:1.5rem;">'
         '<div style="font-family:\'DM Mono\',monospace;font-size:9px;letter-spacing:0.35em;'
-        'color:rgba(200,216,255,0.35);text-transform:uppercase;margin-bottom:12px;">NEXUS // v2.4.1</div>'
+        'color:rgba(200,216,255,0.35);text-transform:uppercase;margin-bottom:12px;">HAMUS // v2.4.1</div>'
         '<div style="font-family:\'Syne\',sans-serif;font-size:20px;font-weight:800;'
         'background:linear-gradient(90deg,#fff,#4B6EFF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">'
         'SYSTEM STATUS</div></div>',
@@ -326,10 +327,10 @@ with st.sidebar:
 
 # ─── Header ───────────────────────────────────────────────────────────────────
 st.markdown(
-    '<div class="nexus-header">'
-    '<div class="nexus-eyebrow">LOCAL INFERENCE · ZERO EGRESS</div>'
-    '<div class="nexus-title">NEXUS</div>'
-    '<div class="nexus-sub">Document Intelligence Engine &nbsp;·&nbsp; Your data stays on-device</div>'
+    '<div class="hamus-header">'
+    '<div class="hamus-eyebrow">LOCAL INFERENCE · ZERO EGRESS</div>'
+    '<div class="hamus-title">HAMUS</div>'
+    '<div class="hamus-sub">Document Intelligence Engine &nbsp;·&nbsp; Your data stays on-device</div>'
     '</div>',
     unsafe_allow_html=True,
 )
@@ -367,7 +368,7 @@ def render_chat_history(messages):
             label, lbl_color, bar_color = "YOU", "#4B6EFF", "#4B6EFF"
             txt_color, font_weight      = "rgba(255,255,255,0.95)", "500"
         else:
-            label, lbl_color, bar_color = "NEXUS", "#00E5C0", "rgba(0,229,192,0.35)"
+            label, lbl_color, bar_color = "HAMUS", "#00E5C0", "rgba(0,229,192,0.35)"
             txt_color, font_weight      = "rgba(200,216,255,0.82)", "400"
 
         parts.append(
@@ -403,6 +404,7 @@ if prompt:
                             filetype = "pdf" if fname.endswith(".pdf") else "txt",
                         )
                         st.session_state.ingested_files.add(fname)
+                        save_file(fname , "pdf" if fname.endswith(".pdf") else "txt")
     sources_used = []
 
     if use_memory and user_text:
@@ -438,6 +440,8 @@ if prompt:
     if enable_web and user_text:
         with st.status("◌  Querying web...", expanded=False):
             search_data = web_search(user_text)
+            if search_data:
+                save_search(user_text)
     system_instructions = (
       "You are HAMUS, a helpful AI assistant.\n"
       "You can answer any question — greetings, general knowledge, coding, math, anything.\n"
@@ -453,12 +457,12 @@ if prompt:
     )
     display_text = user_text if user_text else f"Uploaded {len(all_files)} file(s)."
     st.session_state.messages.append({"role": "user", "content": display_text})
-
+    save_message("user" , display_text)
     with st.spinner(""):
         st.markdown(
             '<div style="font-family:\'DM Mono\',monospace;font-size:10px;'
             'letter-spacing:0.25em;color:rgba(0,229,192,0.5);'
-            'padding:0.6rem 0 0.4rem 1.1rem;">NEXUS · PROCESSING…</div>',
+            'padding:0.6rem 0 0.4rem 1.1rem;">HAMUS · PROCESSING…</div>',
             unsafe_allow_html=True,
         )
         try:
@@ -477,6 +481,7 @@ if prompt:
             if sources_used:
                 full_response += "\n\n─── Sources: " + " · ".join(sources_used)
             st.session_state.messages.append({"role": "assistant", "content": full_response})
+            save_message("assistant" , full_response)
             st.rerun()
         except Exception as e:
             st.error(f"Engine error: {e}")

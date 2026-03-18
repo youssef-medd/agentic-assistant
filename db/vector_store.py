@@ -67,7 +67,28 @@ def list_user_documents(user_id):
         return sorted({m["filename"] for m in results["metadatas"]})
     except Exception :
         return []
-
+def save_message(user_id: str, role: str, content: str):
+    """
+    Save every chat message to ChromaDB.
+    role is either "user" or "assistant"
+    """
+    collection = _get_collection(user_id)
+    
+    import time
+    msg_id = hashlib.md5(f"{user_id}:{role}:{content}:{time.time()}".encode()).hexdigest()
+    
+    collection.upsert(
+        ids=[msg_id],
+        embeddings=[_embed(content)],
+        documents=[content],
+        metadatas=[{
+            "user_id":   user_id,
+            "role":      role,       
+            "type":      "message",  
+            "filename":  "chat",
+            "timestamp": str(time.time()),
+        }]
+    )
 
 
 
