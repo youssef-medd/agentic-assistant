@@ -2,9 +2,8 @@ import streamlit as st
 import ollama
 from modules.tools import web_search
 from modules.parser import process_files
-
+from db.vector_store import ingest_document, query_documents, list_user_documents
 st.set_page_config(page_title="NEXUS — Intelligence Layer", page_icon="◈", layout="wide")
-
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600&display=swap');
@@ -301,12 +300,23 @@ with st.sidebar:
     st.markdown('<div class="sidebar-section-label">MODULES</div>', unsafe_allow_html=True)
     enable_web = st.checkbox("◌  Enable Web Search")
     show_debug = st.toggle("Ξ  Debug Extraction", value=False)
+    use_memory = st.toggle("◈  Vector Memory (ChromaDB)", value=True)
 
     st.markdown('<div class="sidebar-section-label">DOCUMENTS</div>', unsafe_allow_html=True)
     sidebar_files = st.file_uploader(
         "Drop files — PDF / TXT", type=["pdf", "txt"],
         accept_multiple_files=True, label_visibility="visible",
     )
+    if use_memory:
+        stored = list_user_documents(st.session_state.get("user_id", "default_user"))
+        if stored:
+            st.markdown('<div class="sidebar-section-label">MEMORY INDEX</div>', unsafe_allow_html=True)
+            for doc in stored:
+                st.markdown(
+                    f'<div class="status-badge-info" style="font-size:10px;padding:5px 10px;">'
+                    f'&#9632;&nbsp; {doc}</div>',
+                    unsafe_allow_html=True,
+                )
 
     st.markdown('<div class="sidebar-section-label">CONTROLS</div>', unsafe_allow_html=True)
     if st.button("⌫  Flush Memory", type="primary"):
@@ -329,8 +339,10 @@ st.markdown(
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-
-# ─── Custom chat renderer (bypasses Streamlit bubble components entirely) ─────
+if "user_id" not in st.session_state:
+    st.session_state.user_id = "default_user"
+if "ingested_files" not in st.session_state:
+    st.session_state.ingested_files = set()
 def render_chat_history(messages):
     if not messages:
         st.markdown(
@@ -344,7 +356,6 @@ def render_chat_history(messages):
     parts = ['<div style="display:flex;flex-direction:column;">']
     for msg in messages:
         role = msg["role"]
-        # Sanitise then preserve line breaks
         safe = (
             msg["content"]
             .replace("&", "&amp;")
@@ -353,17 +364,11 @@ def render_chat_history(messages):
             .replace("\n", "<br>")
         )
         if role == "user":
-            label      = "YOU"
-            lbl_color  = "#4B6EFF"
-            bar_color  = "#4B6EFF"
-            txt_color  = "rgba(255,255,255,0.95)"
-            font_weight = "500"
+            label, lbl_color, bar_color = "YOU", "#4B6EFF", "#4B6EFF"
+            txt_color, font_weight      = "rgba(255,255,255,0.95)", "500"
         else:
-            label      = "NEXUS"
-            lbl_color  = "#00E5C0"
-            bar_color  = "rgba(0,229,192,0.35)"
-            txt_color  = "rgba(200,216,255,0.82)"
-            font_weight = "400"
+            label, lbl_color, bar_color = "NEXUS", "#00E5C0", "rgba(0,229,192,0.35)"
+            txt_color, font_weight      = "rgba(200,216,255,0.82)", "400"
 
         parts.append(
             f'<div style="display:flex;flex-direction:column;padding:1.1rem 0;'
@@ -376,49 +381,69 @@ def render_chat_history(messages):
             f'color:{txt_color};font-weight:{font_weight};">{safe}</div>'
             f'</div>'
         )
-
     parts.append('</div>')
     st.markdown("".join(parts), unsafe_allow_html=True)
-
-
 render_chat_history(st.session_state.messages)
-
-
-# ─── Input ────────────────────────────────────────────────────────────────────
 prompt = st.chat_input("Ask anything about your documents...", accept_file="multiple")
-
 if prompt:
-    user_text     = prompt.text  if hasattr(prompt, "text")  else prompt
+    user_text      = prompt.text  if hasattr(prompt, "text")  else prompt
     uploaded_files = prompt.files if hasattr(prompt, "files") else []
+    all_files      = list(sidebar_files or []) + list(uploaded_files or [])
+    if all_files and use_memory:
+        for f in all_files:
+            fname = getattr(f, "name", "unknown")
+            if fname not in st.session_state.ingested_files:
+                with st.status(f"◈  Indexing {fname}...", expanded=False):
+                    raw_text = process_files([f])
+                    if raw_text:
+                        ingest_document(
+                            user_id  = st.session_state.user_id,
+                            text     = raw_text,
+                            filename = fname,
+                            filetype = "pdf" if fname.endswith(".pdf") else "txt",
+                        )
+                        st.session_state.ingested_files.add(fname)
+    sources_used = []
 
-    all_files = list(sidebar_files or []) + list(uploaded_files or [])
-
-    context = process_files(all_files) if all_files else ""
-
+    if use_memory and user_text:
+        hits = query_documents(
+            user_id   = st.session_state.user_id,
+            query     = user_text,
+            n_results = 5,
+        )
+        if hits:
+            context = "\n\n".join([
+                f"[Source: {h['source']} | score: {h['score']}]\n{h['text']}"
+                for h in hits
+            ])
+            sources_used = list({h["source"] for h in hits})
+        else:
+            context = process_files(all_files) if all_files else ""
+    else:
+        context = process_files(all_files) if all_files else ""
     if show_debug and all_files:
-        with st.expander("Ξ  Extraction details", expanded=False):
+        with st.expander("Extraction details", expanded=False):
             st.write(f"Files processed: {len(all_files)}")
-            st.write(f"Characters extracted: {len(context)}")
+            st.write(f"Characters in context: {len(context)}")
+            if sources_used:
+                st.write(f"Sources pulled from DB: {sources_used}")
             preview = (context[:1500] + ("..." if len(context) > 1500 else "")).strip() or "[empty]"
             st.code(preview)
-
     if (not user_text or not str(user_text).strip()) and all_files:
         user_text = (
             "Create a professional resume from the uploaded document. "
             "If information is missing, ask me 3–5 targeted questions."
         )
-
     search_data = ""
     if enable_web and user_text:
         with st.status("◌  Querying web...", expanded=False):
             search_data = web_search(user_text)
-
     system_instructions = (
-        "You are a document QA assistant.\n"
-        "ALWAYS answer using only the DOCUMENT CONTEXT plus the USER QUESTION.\n"
-        "- If DOCUMENT CONTEXT has no extractable text, explain that clearly.\n"
-        "- If DOCUMENT CONTEXT is empty, say you have no text and ask for another file.\n"
-        "- If text is present, do NOT say you cannot see the file; just answer from it.\n"
+      "You are HAMUS, a helpful AI assistant.\n"
+      "You can answer any question — greetings, general knowledge, coding, math, anything.\n"
+      "If DOCUMENT CONTEXT is provided and relevant to the question, use it and cite the source filename.\n"
+      "If DOCUMENT CONTEXT is empty or not relevant, just answer from your own knowledge.\n"
+      "Never refuse to answer just because there are no documents.\n"
     )
     full_query = (
         f"{system_instructions}\n\n"
@@ -426,7 +451,6 @@ if prompt:
         f"WEB SEARCH RESULTS:\n{search_data}\n\n"
         f"USER QUESTION: {user_text}"
     )
-
     display_text = user_text if user_text else f"Uploaded {len(all_files)} file(s)."
     st.session_state.messages.append({"role": "user", "content": display_text})
 
@@ -443,12 +467,15 @@ if prompt:
                 for m in st.session_state.messages[:-1]
             ]
             history.append({"role": "user", "content": full_query})
-            response = ollama.chat(model="llama3.2", messages=history)
+
+            response      = ollama.chat(model="llama3.2", messages=history)
             full_response = (
                 response.message.content
                 if hasattr(response, "message")
                 else response["message"]["content"]
             )
+            if sources_used:
+                full_response += "\n\n─── Sources: " + " · ".join(sources_used)
             st.session_state.messages.append({"role": "assistant", "content": full_response})
             st.rerun()
         except Exception as e:
