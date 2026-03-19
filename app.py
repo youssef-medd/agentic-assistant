@@ -8,7 +8,6 @@ st.set_page_config(page_title="HAMUS — Intelligence Layer", page_icon="◈", l
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600&display=swap');
-
 :root {
   --void: #03040A;
   --surface: #0C0F22;
@@ -325,7 +324,7 @@ with st.sidebar:
         st.rerun()
 
 
-# ─── Header ───────────────────────────────────────────────────────────────────
+#header
 st.markdown(
     '<div class="hamus-header">'
     '<div class="hamus-eyebrow">LOCAL INFERENCE · ZERO EGRESS</div>'
@@ -334,9 +333,7 @@ st.markdown(
     '</div>',
     unsafe_allow_html=True,
 )
-
-
-# ─── Session State ────────────────────────────────────────────────────────────
+#session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -413,6 +410,7 @@ if prompt:
             query     = user_text,
             n_results = 5,
         )
+        hits = [h for h in hits if h["score"] >0.3]
         if hits:
             context = "\n\n".join([
                 f"[Source: {h['source']} | score: {h['score']}]\n{h['text']}"
@@ -434,7 +432,7 @@ if prompt:
     if (not user_text or not str(user_text).strip()) and all_files:
         user_text = (
             "Create a professional resume from the uploaded document. "
-            "If information is missing, ask me 3–5 targeted questions."
+            "If information is missing, ask me 3 to 5 targeted questions."
         )
     search_data = ""
     if enable_web and user_text:
