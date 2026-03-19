@@ -57,14 +57,12 @@ def save_message(role : str , content : str):
     )
     conn.commit()
     conn.close()
-def save_file(filename: str, filetype: str):
+def save_file(user_id: str, filename: str, filetype: str):
     conn = get_connection()
     conn.execute(
-        "INSERT INTO files (filename, filetype, uploaded_at) VALUES (?, ?, ?)",
-        (filename, filetype, datetime.now().isoformat())
+        "INSERT INTO files (user_id, filename, filetype, uploaded_at) VALUES (?, ?, ?, ?)",
+        (user_id, filename, filetype, datetime.now().isoformat())
     )
-    conn.commit()
-    conn.close()
     conn.commit()
     conn.close()
 def save_search( query : str):

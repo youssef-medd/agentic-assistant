@@ -401,7 +401,7 @@ if prompt:
                             filetype = "pdf" if fname.endswith(".pdf") else "txt",
                         )
                         st.session_state.ingested_files.add(fname)
-                        save_file(fname , "pdf" if fname.endswith(".pdf") else "txt")
+                        save_file(st.session_state.user_id, fname, "pdf" if fname.endswith(".pdf") else "txt")
     sources_used = []
 
     if use_memory and user_text:
@@ -439,7 +439,7 @@ if prompt:
         with st.status("◌  Querying web...", expanded=False):
             search_data = web_search(user_text)
             if search_data:
-                save_search(user_text)
+                save_search(st.session_state.user_id, user_text)
     system_instructions = (
       "You are HAMUS, a helpful AI assistant.\n"
       "You can answer any question — greetings, general knowledge, coding, math, anything.\n"
