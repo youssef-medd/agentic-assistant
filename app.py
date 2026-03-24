@@ -4,6 +4,7 @@ from modules.tools import web_search
 from modules.parser import process_files
 from db.vector_store import ingest_document , query_documents, list_user_documents
 from db.database import save_message, save_file, save_search
+from modules.multimodal import is_image_file, encode_image_to_base64, build_llava_message, get_image_info
 st.set_page_config(page_title="HAMUS — Intelligence Layer", page_icon="◈", layout="wide")
 st.markdown("""
 <style>
@@ -385,8 +386,10 @@ if prompt:
     user_text      = prompt.text  if hasattr(prompt, "text")  else prompt
     uploaded_files = prompt.files if hasattr(prompt, "files") else []
     all_files      = list(sidebar_files or []) + list(uploaded_files or [])
-    if all_files and use_memory:
-        for f in all_files:
+    image_files = [ f for f in all_files if is_image_file(f)]
+    document_files = [f for f in all_files if not is_image_file(f)]
+    if document_files and use_memory:
+        for f in document_files :
             fname = getattr(f, "name", "unknown")
             if fname not in st.session_state.ingested_files:
                 with st.status(f"◈  Indexing {fname}...", expanded=False):
@@ -401,7 +404,6 @@ if prompt:
                         st.session_state.ingested_files.add(fname)
                         save_file(st.session_state.user_id, fname, "pdf" if fname.endswith(".pdf") else "txt")
     sources_used = []
-
     if use_memory and user_text:
         hits = query_documents(
             user_id   = st.session_state.user_id,
@@ -422,32 +424,38 @@ if prompt:
     if show_debug and all_files:
         with st.expander("Extraction details", expanded=False):
             st.write(f"Files processed: {len(all_files)}")
+            st.write(f"Image files : {len(image_files)}")
             st.write(f"Characters in context: {len(context)}")
             if sources_used:
                 st.write(f"Sources pulled from DB: {sources_used}")
+            if image_files :
+                for img_f in image_files :
+                    info = get_image_info(img_f)
+                    st.write(f"image : {info['name']} | {info['mime_type']} | {info['size']}")
             preview = (context[:1500] + ("..." if len(context) > 1500 else "")).strip() or "[empty]"
             st.code(preview)
-    if (not user_text or not str(user_text).strip()) and all_files:
+    if (not user_text or not str(user_text).strip()) and document_files :
         user_text = (
             "explain it"
         )
-    search_data = ""
-    if enable_web and user_text:
-        with st.status("◌  Querying web...", expanded=False):
-            search_data = web_search(user_text)
-            if search_data:
-                save_search(st.session_state.user_id, user_text)
+    #"""search_data = ""
+    #if enable_web and user_text:
+        #with st.status("◌  Querying web...", expanded=False):
+            #search_data = web_search(user_text)
+            #if search_data:
+                #save_search(st.session_state.user_id, user_text)"""
+    #to fix later ( the chat _ history) 
     system_instructions = (
-      "You are HAMUS, a helpful AI assistant.\n"
-      "You can answer any question — greetings, general knowledge, coding, math, anything.\n"
-      "If DOCUMENT CONTEXT is provided and relevant to the question, use it and cite the source filename.\n"
-      "If DOCUMENT CONTEXT is empty or not relevant, just answer from your own knowledge.\n"
-      "Never refuse to answer just because there are no documents.\n"
+        "You are HAMUS, a helpful AI assistant.\n"
+                    "You can answer any question — greetings, general knowledge, coding, math, anything.\n"
+                    "If DOCUMENT CONTEXT is provided and relevant to the question, use it and cite the source filename.\n"
+                    "If DOCUMENT CONTEXT is empty or not relevant, just answer from your own knowledge.\n"
+                    "Never refuse to answer just because there are no documents.\n"
     )
     full_query = (
         f"{system_instructions}\n\n"
         f"DOCUMENT CONTEXT:\n{context}\n\n"
-        f"WEB SEARCH RESULTS:\n{search_data}\n\n"
+        #f"WEB SEARCH RESULTS:\n{search_data}\n\n"
         f"USER QUESTION: {user_text}"
     )
     display_text = user_text if user_text else f"Uploaded {len(all_files)} file(s)."
@@ -460,23 +468,58 @@ if prompt:
             'padding:0.6rem 0 0.4rem 1.1rem;">HAMUS · PROCESSING…</div>',
             unsafe_allow_html=True,
         )
-        try:
+        if image_files :
+            st.session_state.active_model = "llava"
+            b64 = encode_image_to_base64(image_files[0])
+            vision_msg = build_llava_message(user_text , b64)
+            vision_msg["content"] = (
+            "you are HAMUS , the vision AI"
+            "analyze images carefully and respond clearly . \n\n"
+            + vision_msg["content"])
+            if context :
+                vision_msg["content"] += (
+                    f" document context :\n{context}"
+            )
+            with st.status("◈  Vision model processing image...", expanded=False):
+                response = ollama.chat(
+                    model = "llava",
+                    messages = [vision_msg],
+                )
+            used_vision = True
+        else :
+            st.session_state.active_model = "llama3.2"
+            system_instructions = (
+                "You are HAMUS, a helpful AI assistant.\n"
+                "You can answer any question — greetings, general knowledge, coding, math, anything.\n"
+                "If DOCUMENT CONTEXT is provided and relevant to the question, use it and cite the source filename.\n"
+                "If DOCUMENT CONTEXT is empty or not relevant, just answer from your own knowledge.\n"
+                "Never refuse to answer just because there are no documents.\n"
+            )
+            full_query = (
+                f"{system_instructions}\n\n"
+                f"DOCUMENT CONTEXT:\n{context}\n\n"
+                #f"WEB SEARCH RESULTS:\n{search_data}\n\n"
+                f"USER QUESTION: {user_text}"
+            )
             history = [
                 {"role": m["role"], "content": m["content"]}
                 for m in st.session_state.messages[:-1]
             ]
             history.append({"role": "user", "content": full_query})
-
-            response      = ollama.chat(model="llama3.2", messages=history)
-            full_response = (
-                response.message.content
-                if hasattr(response, "message")
-                else response["message"]["content"]
+            response = ollama.chat(
+                model    = "llama3.2",
+                messages = history,
             )
-            if sources_used and context :
-                full_response += "\n\n─── Sources: " + " · ".join(sources_used)
-            st.session_state.messages.append({"role": "assistant", "content": full_response})
-            save_message("assistant" , full_response)
-            st.rerun()
-        except Exception as e:
-            st.error(f"Engine error: {e}")
+            used_vision = False
+        full_response = (
+            response.message.content
+            if hasattr(response , "message")
+            else response["message"]["content"]
+        )
+        assistant_msg = {
+            "role" : "assistant" ,
+            "content" : full_response ,
+            "used_vision" : used_vision , 
+        }
+        st.session_state.messages.append(assistant_msg)
+        st.rerun()
