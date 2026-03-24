@@ -2,7 +2,7 @@ import streamlit as st
 import ollama
 from modules.tools import web_search
 from modules.parser import process_files
-from db.vector_store import ingest_document, query_documents, list_user_documents
+from db.vector_store import ingest_document , query_documents, list_user_documents
 from db.database import save_message, save_file, save_search
 st.set_page_config(page_title="HAMUS — Intelligence Layer", page_icon="◈", layout="wide")
 st.markdown("""
@@ -322,8 +322,6 @@ with st.sidebar:
     if st.button("⌫  Flush Memory", type="primary"):
         st.session_state.messages = []
         st.rerun()
-
-
 #header
 st.markdown(
     '<div class="hamus-header">'
@@ -410,7 +408,7 @@ if prompt:
             query     = user_text,
             n_results = 5,
         )
-        hits = [h for h in hits if h["score"] >0.3]
+        hits = [h for h in hits if h["score"] > 0.35 ]
         if hits:
             context = "\n\n".join([
                 f"[Source: {h['source']} | score: {h['score']}]\n{h['text']}"
@@ -431,8 +429,7 @@ if prompt:
             st.code(preview)
     if (not user_text or not str(user_text).strip()) and all_files:
         user_text = (
-            "Create a professional resume from the uploaded document. "
-            "If information is missing, ask me 3 to 5 targeted questions."
+            "explain it"
         )
     search_data = ""
     if enable_web and user_text:
@@ -476,7 +473,7 @@ if prompt:
                 if hasattr(response, "message")
                 else response["message"]["content"]
             )
-            if sources_used:
+            if sources_used and context :
                 full_response += "\n\n─── Sources: " + " · ".join(sources_used)
             st.session_state.messages.append({"role": "assistant", "content": full_response})
             save_message("assistant" , full_response)

@@ -37,7 +37,6 @@ else :
     st.info("no message yet")
 st.divider()
 #files table
-# files table
 st.subheader("Uploaded Files")
 if files:
     import pandas as pd
@@ -56,7 +55,7 @@ if searches:
     df_searches = pd.DataFrame([dict(s) for s in searches])
     df_searches = df_searches[["query", "timestamp"]]
     df_searches.columns = ["Query", "Timestamp"]
-    df_searches["Timestamp"] = df_searches["Timestamp"].str[:16].str.replace("T", " ")
     st.dataframe(df_searches, use_container_width=True)
 else:
     st.info("No searches yet.")
+    
