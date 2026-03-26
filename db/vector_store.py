@@ -57,7 +57,7 @@ def query_documents(user_id , query , n_results = 5):
         hits.append({
             "text" : doc ,
             "source" : meta.get("filename"),
-            "score" : round( - dist ,3)
+            "score" : round(1 - dist ,3)
         })
     return hits
 def list_user_documents(user_id):
@@ -65,26 +65,9 @@ def list_user_documents(user_id):
         collection = _get_collection(user_id)
         results = collection.get(include=["metadatas"])
         return sorted({m["filename"] for m in results["metadatas"]})
-    except Exception :
+    except Exception as e:
+        print(f"[vector_store] list_user_documents failed : {e}")
         return []
-def save_message_to_vector_memory(user_id: str, role: str, content: str):
-    collection = _get_collection(user_id)
-    import time
-    msg_id = hashlib.md5(f"{user_id}:{role}:{content}:{time.time()}".encode()).hexdigest()
-    
-    collection.upsert(
-        ids=[msg_id],
-        embeddings=[_embed(content)],
-        documents=[content],
-        metadatas=[{
-            "user_id":   user_id,
-            "role":      role,       
-            "type":      "message",  
-            "filename":  "chat",
-            "timestamp": str(time.time()),
-        }]
-    )
-
 
 
 

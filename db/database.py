@@ -71,5 +71,3 @@ def save_search(user_id: str, query: str):
             (user_id, query, datetime.now().isoformat())
         )
         conn.commit()
-
-init_db()

@@ -24,10 +24,10 @@ MAX_IMAGES = 2
 def is_image_file(uploaded_file)->bool:
     if uploaded_file is None:
         return False
-    file_type = getattr(uploaded_file,"type") or ""
+    file_type = getattr(uploaded_file, "type", "")
     if file_type.lower() in IMAGES_MIME_TYPES:
         return True
-    name = getattr(uploaded_file,"name") or ""
+    name = getattr(uploaded_file, "name", "")
     ext="."+name.rsplit(".",1)[-1].lower() if "." in name else ""
     return ext in IMAGES_EXTENSIONS
 def encode_image_to_base64(uploaded_file)->Optional[str]:

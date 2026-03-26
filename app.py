@@ -4,6 +4,8 @@ from io import BytesIO
 from modules.parser import process_files
 from db.vector_store import ingest_document, query_documents, list_user_documents
 from db.database import save_message, save_file
+from db.database import init_db
+init_db()
 from modules.multimodal import is_image_file, encode_image_to_base64, build_llava_message, get_image_info
 
 st.set_page_config(page_title="AION — Intelligence Layer", page_icon="", layout="wide")
@@ -278,7 +280,13 @@ if "ingested_files" not in st.session_state:
     st.session_state.ingested_files = set()
 if "stored_files" not in st.session_state:
     st.session_state.stored_files = {}
-
+system_instructions = (
+    "You are AION, a helpful AI assistant.\n"
+    "You can answer any question — greetings, general knowledge, coding, math, anything.\n"
+    "If DOCUMENT CONTEXT is provided and relevant to the question, use it and cite the source filename.\n"
+    "If DOCUMENT CONTEXT is empty or not relevant, just answer from your own knowledge.\n"
+    "Never refuse to answer just because there are no documents.\n"
+)
 with st.sidebar:
     st.markdown(
         '<div style="margin-bottom:1.5rem;">'
@@ -452,13 +460,6 @@ if prompt:
             st.code(preview)
     if not str(user_text).strip() and document_files:
         user_text = "explain it"
-    system_instructions = (
-        "You are AION, a helpful AI assistant.\n"
-        "You can answer any question — greetings, general knowledge, coding, math, anything.\n"
-        "If DOCUMENT CONTEXT is provided and relevant to the question, use it and cite the source filename.\n"
-        "If DOCUMENT CONTEXT is empty or not relevant, just answer from your own knowledge.\n"
-        "Never refuse to answer just because there are no documents.\n"
-    )
     display_text = user_text if user_text else f"Uploaded {len(all_files)} file(s)."
     st.session_state.messages.append({"role": "user", "content": display_text})
     save_message("user", display_text)
