@@ -42,9 +42,12 @@ if files:
     import pandas as pd
     df_files = pd.DataFrame([dict(f) for f in files])
     df_files = df_files[["filename", "filetype", "uploaded_at"]]
-    df_files.columns = ["Filename", "Type", "Uploaded At"]
-    df_files["Uploaded At"] = df_files["Uploaded At"].str[:16].str.replace("T", " ")
-    st.dataframe(df_files, use_container_width=True)
+    images = df_files[df_files["filetype"] == "image"]
+    docs = df_files[df_files["filetype"] != "image"]
+    st.markdown("images")
+    st.dataframe(images, use_container_width=True)
+    st.markdown("documents")
+    st.dataframe(docs , use_container_width=True)
 else:
     st.info("No files uploaded yet.")
 st.divider()

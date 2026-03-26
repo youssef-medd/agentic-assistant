@@ -34,7 +34,7 @@ def _extract_pdf_with_fallback(pdf_file) -> tuple[str, str]:
 def process_files(uploaded_files: Iterable) -> str:
     combined_parts: list[str] = []
     for file in uploaded_files:
-        file_type = getattr(file, "type", "") or ""
+        file_type = getattr(file, "type") or ""
         name = getattr(file, "name", "uploaded_file")
         try:
             if file_type == "application/pdf":
