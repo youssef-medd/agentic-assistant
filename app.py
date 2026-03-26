@@ -6,7 +6,7 @@ from db.vector_store import ingest_document, query_documents, list_user_document
 from db.database import save_message, save_file
 from modules.multimodal import is_image_file, encode_image_to_base64, build_llava_message, get_image_info
 
-st.set_page_config(page_title="HAMUS — Intelligence Layer", page_icon="◈", layout="wide")
+st.set_page_config(page_title="AION — Intelligence Layer", page_icon="", layout="wide")
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600&display=swap');
@@ -69,8 +69,8 @@ header[data-testid="stHeader"] { background: transparent !important; }
   padding: 2.5rem 2rem 6rem !important;
   margin: 0 auto;
 }
-.hamus-header { animation: boot 1s var(--transition); margin-bottom: 3rem; }
-.hamus-eyebrow {
+.AION-header { animation: boot 1s var(--transition); margin-bottom: 3rem; }
+.AION-eyebrow {
   font-family: 'DM Mono', monospace;
   font-size: 10px;
   letter-spacing: 0.3em;
@@ -80,7 +80,7 @@ header[data-testid="stHeader"] { background: transparent !important; }
   align-items: center;
   gap: 8px;
 }
-.hamus-eyebrow::before {
+.AION-eyebrow::before {
   content: '';
   display: inline-block;
   width: 4px; height: 4px;
@@ -89,7 +89,7 @@ header[data-testid="stHeader"] { background: transparent !important; }
   box-shadow: 0 0 8px var(--pulse);
   animation: ticker 1.5s ease-in-out infinite;
 }
-.hamus-title {
+.AION-title {
   font-family: 'Syne', sans-serif;
   font-size: clamp(38px, 5vw, 58px);
   font-weight: 800;
@@ -103,7 +103,7 @@ header[data-testid="stHeader"] { background: transparent !important; }
   animation: arc-trace 6s ease infinite;
   margin-bottom: 8px;
 }
-.hamus-sub {
+.AION-sub {
   font-family: 'DM Mono', monospace;
   font-size: 12px;
   color: var(--text-secondary);
@@ -283,7 +283,7 @@ with st.sidebar:
     st.markdown(
         '<div style="margin-bottom:1.5rem;">'
         '<div style="font-family:\'DM Mono\',monospace;font-size:9px;letter-spacing:0.35em;'
-        'color:rgba(200,216,255,0.35);text-transform:uppercase;margin-bottom:12px;">HAMUS // v2.4.1</div>'
+        'color:rgba(200,216,255,0.35);text-transform:uppercase;margin-bottom:12px;">AION // v2.4.1</div>'
         '<div style="font-family:\'Syne\',sans-serif;font-size:20px;font-weight:800;'
         'background:linear-gradient(90deg,#fff,#4B6EFF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">'
         'SYSTEM STATUS</div></div>',
@@ -294,7 +294,7 @@ with st.sidebar:
     st.markdown('<div class="sidebar-section-label">MODULES</div>', unsafe_allow_html=True)
     enable_web = st.checkbox("◌  Enable Web Search")
     show_debug = st.toggle("Ξ  Debug Extraction", value=False)
-    use_memory = st.toggle("◈  Vector Memory (ChromaDB)", value=True)
+    use_memory = st.toggle("  Vector Memory (ChromaDB)", value=True)
     st.markdown('<div class="sidebar-section-label">DOCUMENTS</div>', unsafe_allow_html=True)
     sidebar_files = st.file_uploader(
         "Drop files — PDF / TXT / Images",
@@ -336,10 +336,10 @@ with st.sidebar:
         st.rerun()
 
 st.markdown(
-    '<div class="hamus-header">'
-    '<div class="hamus-eyebrow">LOCAL INFERENCE · ZERO EGRESS</div>'
-    '<div class="hamus-title">HAMUS</div>'
-    '<div class="hamus-sub">Document Intelligence Engine &nbsp;·&nbsp; Your data stays on-device</div>'
+    '<div class="AION-header">'
+    '<div class="AION-eyebrow">LOCAL INFERENCE · ZERO EGRESS</div>'
+    '<div class="AION-title">AION</div>'
+    '<div class="AION-sub">Document Intelligence Engine &nbsp;·&nbsp; Your data stays on-device</div>'
     '</div>',
     unsafe_allow_html=True,
 )
@@ -376,7 +376,7 @@ def render_chat_history(messages):
             label, lbl_color, bar_color = "YOU", "#4B6EFF", "#4B6EFF"
             txt_color, font_weight = "rgba(255,255,255,0.95)", "500"
         else:
-            label, lbl_color, bar_color = "HAMUS", "#00E5C0", "rgba(0,229,192,0.35)"
+            label, lbl_color, bar_color = "AION", "#00E5C0", "rgba(0,229,192,0.35)"
             txt_color, font_weight = "rgba(200,216,255,0.82)", "400"
         parts.append(
             f'<div style="display:flex;flex-direction:column;padding:1.1rem 0;'
@@ -453,7 +453,7 @@ if prompt:
     if not str(user_text).strip() and document_files:
         user_text = "explain it"
     system_instructions = (
-        "You are HAMUS, a helpful AI assistant.\n"
+        "You are AION, a helpful AI assistant.\n"
         "You can answer any question — greetings, general knowledge, coding, math, anything.\n"
         "If DOCUMENT CONTEXT is provided and relevant to the question, use it and cite the source filename.\n"
         "If DOCUMENT CONTEXT is empty or not relevant, just answer from your own knowledge.\n"
@@ -464,16 +464,14 @@ if prompt:
     save_message("user", display_text)
     if image_files:
       with st.status("Vision model processing image...", expanded=False):
-          # Use validate_images — it handles encoding, resizing, and returns a List[str]
           from modules.multimodal import validate_images
           encoded_images = validate_images(image_files)
-          
           if not encoded_images:
               st.error("Could not encode image(s). Check format or file size.")
           else:
               vision_msg = build_llava_message(user_text or "Describe this image.", encoded_images)
               vision_msg["content"] = (
-                  "You are HAMUS, the vision AI. Analyze images carefully.\n\n"
+                  "You are AION, the vision AI. Analyze images carefully.\n\n"
                   + vision_msg["content"]
                   + (f"\n\nDocument context:\n{context}" if context else "")
               )
