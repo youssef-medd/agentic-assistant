@@ -4,7 +4,7 @@ from datetime import datetime
 from db.database import init_db
 init_db()
 DB_PATH = "./database.db"
-st.set_page_config(page_title = "HAMUS Admin" , page_icon="◈" , layout = "wide")
+st.set_page_config(page_title = "AION Admin" , page_icon="◈" , layout = "wide")
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -15,7 +15,7 @@ files    = conn.execute("SELECT * FROM files ORDER BY uploaded_at DESC").fetchal
 searches = conn.execute("SELECT * FROM searches ORDER BY timestamp DESC").fetchall()
 conn.close()
 #header
-st.header("HAMUS Admin Dashboard")
+st.header("AION Admin Dashboard")
 st.divider()
 col1 , col2 , col3 = st.columns(3)
 col1.metric("total messages" , len(messages))

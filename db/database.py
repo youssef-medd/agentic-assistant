@@ -71,3 +71,8 @@ def save_search(user_id: str, query: str):
             (user_id, query, datetime.now().isoformat())
         )
         conn.commit()
+def clear_user_documents(user_id):
+    try:
+        _client.delete_collection(f"user_{user_id}")
+    except Exception as e:
+        print(f"[vector_store] clear failed: {e}")

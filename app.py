@@ -280,8 +280,10 @@ if "ingested_files" not in st.session_state:
     st.session_state.ingested_files = set()
 if "stored_files" not in st.session_state:
     st.session_state.stored_files = {}
+    st.session_state.ingested_files = set()
 system_instructions = (
     "You are AION, a helpful AI assistant.\n"
+    "IMPORTANT: Always respond in English, no matter what language the document is in.\n"
     "You can answer any question — greetings, general knowledge, coding, math, anything.\n"
     "If DOCUMENT CONTEXT is provided and relevant to the question, use it and cite the source filename.\n"
     "If DOCUMENT CONTEXT is empty or not relevant, just answer from your own knowledge.\n"
@@ -338,10 +340,11 @@ with st.sidebar:
             )
     st.markdown('<div class="sidebar-section-label">CONTROLS</div>', unsafe_allow_html=True)
     if st.button("⌫  Flush Memory", type="primary"):
-        st.session_state.messages = []
-        st.session_state.stored_files = {}
-        st.session_state.ingested_files = set()
-        st.rerun()
+      st.session_state.messages = []
+      st.session_state.ingested_files = set()
+      from db.vector_store import clear_user_documents
+      clear_user_documents(st.session_state.user_id)
+      st.rerun()
 
 st.markdown(
     '<div class="AION-header">'
@@ -351,7 +354,6 @@ st.markdown(
     '</div>',
     unsafe_allow_html=True,
 )
-
 def reconstruct_files(stored_files):
     files = []
     for fname, fdata in stored_files.items():
@@ -407,33 +409,38 @@ prompt = st.chat_input("Ask anything about your documents...", accept_file="mult
 if prompt:
     user_text = prompt.text if hasattr(prompt, "text") else prompt
     uploaded_files = prompt.files if hasattr(prompt, "files") else []
+    # build all_files only from THIS message
+    all_files = []
     for f in uploaded_files:
-        if f.name not in st.session_state.stored_files:
-            st.session_state.stored_files[f.name] = {
-                "bytes": f.read(),
-                "name": f.name,
-                "type": f.type,
-            }
-    all_files = reconstruct_files(st.session_state.stored_files)
+        raw = f.read()
+        buf = BytesIO(raw)
+        buf.name = f.name
+        buf.type = f.type
+        all_files.append(buf)
     image_files = [f for f in all_files if is_image_file(f)]
     document_files = [f for f in all_files if not is_image_file(f)]
     if document_files and use_memory:
+        from db.vector_store import _client 
+        from db.vector_store import clear_user_documents
+        clear_user_documents(st.session_state.user_id)
+        st.session_state.ingested_files = set()
         for f in document_files:
+            f.seek(0)
             fname = f.name
-            if fname not in st.session_state.ingested_files:
-                raw_text = process_files([f])
-                if raw_text:
-                    ingest_document(
-                        user_id=st.session_state.user_id,
-                        text=raw_text,
-                        filename=fname,
-                        filetype="pdf" if fname.endswith(".pdf") else "txt",
+            raw_text = process_files([f])
+            if raw_text:
+              ingest_document(
+                user_id=st.session_state.user_id,
+                text=raw_text,
+                filename=fname,
+                filetype="pdf" if fname.endswith(".pdf") else "txt",
                     )
-                    st.session_state.ingested_files.add(fname)
-                    save_file(st.session_state.user_id, fname, "pdf" if fname.endswith(".pdf") else "txt")
+            save_file(st.session_state.user_id, fname, "pdf" if fname.endswith(".pdf") else "txt")
     sources_used = []
     if use_memory and user_text:
         hits = query_documents(user_id=st.session_state.user_id, query=user_text)
+        if not isinstance(hits , list) :
+            hits = []
         hits = [h for h in hits if h.get("score", 0) > 0.35]
         if hits:
             context = "\n\n".join([
@@ -483,8 +490,8 @@ if prompt:
             full_query = (
                 f"{system_instructions}\n\n"
                 f"DOCUMENT CONTEXT:\n{context}\n\n"
-                f"USER QUESTION: {user_text}"
-            )
+                f"USER QUESTION: {user_text}\n\n"
+                f"Remember: respond in English only.")
             history = [
                 {"role": m["role"], "content": m["content"]}
                 for m in st.session_state.messages[:-1]

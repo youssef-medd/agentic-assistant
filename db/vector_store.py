@@ -4,7 +4,7 @@ from chromadb.config import Settings
 import ollama
 _client = chromadb.PersistentClient(
     path = "./chroma_db" ,
-    settings = Settings(anonymized_telemetry = False))
+    settings = Settings(anonymized_telemetry = False , allow_reset = True))
 def _get_collection(user_id):
     return _client.get_or_create_collection(
         name = f"user_{user_id}",
@@ -19,7 +19,7 @@ def _chunk(text , size = 400 , overlap = 60):
     while i < len(words):
         chunks.append(" ".join(words[i : i+ size]))
         i += size - overlap
-    return [c for c in chunks if c.strip()]
+    return [c for c in chunks if len(c.strip()) >= 10]
 def ingest_document(user_id , text , filename , filetype = "pdf"):
     if not text or not text.strip():
         return 0
@@ -68,7 +68,8 @@ def list_user_documents(user_id):
     except Exception as e:
         print(f"[vector_store] list_user_documents failed : {e}")
         return []
-
-
-
-    
+def clear_user_documents(user_id):
+    try:
+        _client.delete_collection(f"user_{user_id}")
+    except Exception as e:
+        print(f"[vector_store] clear failed: {e}")
