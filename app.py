@@ -476,6 +476,7 @@ if prompt:
           encoded_images = validate_images(image_files)
           if not encoded_images:
               st.error("Could not encode image(s). Check format or file size.")
+              st.stop()
           else:
               vision_msg = build_llava_message(user_text or "Describe this image.", encoded_images)
               vision_msg["content"] = (
